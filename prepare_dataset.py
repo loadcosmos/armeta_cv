@@ -6,9 +6,10 @@ Usage:
     python prepare_dataset_kaggle.py
 
 Expected structure:
-    /kaggle/input/armeta-docs/
-    ├── pdf/                          (45 PDF files)
-    └── selected_annotations.json     (single JSON with all annotations)
+    /kaggle/input/armeta-docs/data/
+    ├── pdf/                                      (45 PDF files)
+    └── annotations/
+        └── selected_annotations.json             (single JSON with all annotations)
 
 Output:
     /kaggle/working/data/
@@ -41,11 +42,11 @@ CLASS_MAPPING = {
 }
 
 # Kaggle paths
-INPUT_DIR = Path('/kaggle/input/armeta-docs')
+INPUT_DIR = Path('/kaggle/input/armeta-docs/data')
 OUTPUT_DIR = Path('/kaggle/working/data')
 
 PDF_DIR = INPUT_DIR / 'pdf'
-ANNOTATIONS_FILE = INPUT_DIR / 'selected_annotations.json'
+ANNOTATIONS_FILE = INPUT_DIR / 'annotations' / 'selected_annotations.json'
 
 DPI = 200
 TRAIN_SPLIT = 0.8

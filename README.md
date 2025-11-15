@@ -10,7 +10,7 @@ Hybrid YOLOv8s + OpenCV system for detecting signatures, stamps, and QR codes in
 
 **Total time: ~1 hour**
 
-1. **Upload data** to Kaggle Dataset: `pdf/` folder + `selected_annotations.json`
+1. **Upload data** to Kaggle Dataset: `data/` folder (contains `pdf/` and `annotations/`)
 2. **Create Kaggle Notebook** (GPU T4 + Internet ON)
 3. **Run** 6 cells from `KAGGLE_QUICKSTART.md`
 4. **Download** `best.pt` model
@@ -182,8 +182,10 @@ sudo apt-get install -y poppler-utils libgl1
 
 ```
 Input:
-  pdf/                        (45 PDF files)
-  selected_annotations.json   (annotations)
+  /kaggle/input/armeta-docs/data/
+    ├── pdf/                                (45 PDF files)
+    └── annotations/
+        └── selected_annotations.json       (all annotations)
 
 Processing:
   1. Convert PDFs → images (200 DPI)
@@ -191,10 +193,14 @@ Processing:
   3. Train/val split (80/20)
 
 Output:
-  data/
-    train/  (103 images)
-    val/    (26 images)
-    data.yaml
+  /kaggle/working/data/
+    ├── train/
+    │   ├── images/  (103 images)
+    │   └── labels/  (103 .txt files)
+    ├── val/
+    │   ├── images/  (26 images)
+    │   └── labels/  (26 .txt files)
+    └── data.yaml
 ```
 
 ### Training Results

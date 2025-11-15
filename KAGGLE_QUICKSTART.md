@@ -10,15 +10,19 @@
 
 1. Go to https://www.kaggle.com/datasets
 2. Click "New Dataset"
-3. Upload files:
+3. Upload folder structure:
    ```
-   pdf/                        (45 PDF files)
-   selected_annotations.json   (1 JSON file - ONLY THIS ONE!)
+   data/
+   ├── pdf/                                (45 PDF files)
+   └── annotations/
+       └── selected_annotations.json       (ONLY THIS FILE!)
    ```
 4. Dataset name: **`armeta-docs`**
 5. Click "Create"
 
-**IMPORTANT:** Upload ONLY `selected_annotations.json`, NOT `masked_annotations.json`!
+**IMPORTANT:**
+- Upload the ENTIRE `data/` folder with this structure
+- Use ONLY `selected_annotations.json`, NOT `masked_annotations.json`!
 
 ---
 
@@ -188,10 +192,14 @@ print("Go to Output tab (right panel) to download")
 
 ### Error: "PDF directory not found"
 
-Check dataset name matches:
+Check dataset name and structure matches:
 ```python
 # In prepare_dataset.py line 44:
-INPUT_DIR = Path('/kaggle/input/armeta-docs')  # Must match your dataset name
+INPUT_DIR = Path('/kaggle/input/armeta-docs/data')  # Must match your dataset name + /data
+
+# Verify structure:
+!ls -la /kaggle/input/armeta-docs/data/
+# Should see: pdf/ and annotations/ folders
 ```
 
 ### Error: "CUDA out of memory"
@@ -207,7 +215,7 @@ Check JSON format:
 ```python
 # Debug annotations
 import json
-with open('/kaggle/input/armeta-docs/selected_annotations.json') as f:
+with open('/kaggle/input/armeta-docs/data/annotations/selected_annotations.json') as f:
     data = json.load(f)
     print(type(data))
     print(list(data.keys())[:5] if isinstance(data, dict) else data[:2])
