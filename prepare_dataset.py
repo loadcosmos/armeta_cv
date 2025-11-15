@@ -53,50 +53,76 @@ TRAIN_SPLIT = 0.8
 
 # ============= FUNCTIONS =============
 def load_annotations(json_path):
-    """Load selected_annotations.json"""
+    """
+    Load selected_annotations.json
+
+    Expected format:
+    {
+      "pdf_name.pdf": {
+        "page_1": {
+          "annotations": [
+            {"annotation_123": {"category": "signature", "bbox": {...}}},
+            ...
+          ]
+        },
+        "page_2": {...}
+      }
+    }
+    """
     print(f"📖 Loading annotations from {json_path}...")
 
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # Expected format: {filename: {annotations: [...], ...}, ...}
-    # or list of {filename, annotations, ...}
-    # or COCO format {images: [...], annotations: [...]}
+    annotations_by_image = {}
 
-    annotations_by_file = {}
+    # Parse the nested structure: PDF → pages → annotations
+    if isinstance(data, dict):
+        for pdf_filename, pages_data in data.items():
+            # Remove .pdf extension for matching
+            pdf_basename = pdf_filename.replace('.pdf', '')
 
-    # Handle COCO format
-    if 'images' in data and 'annotations' in data:
-        # COCO format
-        images_dict = {img['id']: img['file_name'] for img in data['images']}
+            if isinstance(pages_data, dict):
+                # Iterate through pages (page_1, page_2, etc.)
+                for page_key, page_data in pages_data.items():
+                    if not isinstance(page_data, dict):
+                        continue
 
-        for ann in data['annotations']:
-            img_id = ann['image_id']
-            filename = images_dict.get(img_id, f"unknown_{img_id}")
+                    # Extract page number from "page_X"
+                    if page_key.startswith('page_'):
+                        page_num = page_key.split('_')[1]
+                    else:
+                        continue
 
-            if filename not in annotations_by_file:
-                annotations_by_file[filename] = []
+                    # Get annotations for this page
+                    annotations_list = page_data.get('annotations', [])
 
-            annotations_by_file[filename].append(ann)
+                    if not annotations_list:
+                        continue
 
-    # Handle dict format {filename: data}
-    elif isinstance(data, dict):
-        for filename, file_data in data.items():
-            if isinstance(file_data, dict) and 'annotations' in file_data:
-                annotations_by_file[filename] = file_data['annotations']
-            elif isinstance(file_data, list):
-                annotations_by_file[filename] = file_data
+                    # Create image name that matches PDF conversion: basename_page_N.png
+                    image_name = f"{pdf_basename}_page_{page_num}"
 
-    # Handle list format
-    elif isinstance(data, list):
-        for item in data:
-            if 'filename' in item or 'image' in item:
-                filename = item.get('filename') or item.get('image')
-                annotations = item.get('annotations') or item.get('objects') or []
-                annotations_by_file[filename] = annotations
+                    # Unwrap nested annotation structure
+                    # Each annotation is: {"annotation_XXX": {category, bbox, ...}}
+                    unwrapped_annotations = []
+                    for ann_wrapper in annotations_list:
+                        if isinstance(ann_wrapper, dict):
+                            # Get the actual annotation (first value in dict)
+                            for ann_id, ann_data in ann_wrapper.items():
+                                if isinstance(ann_data, dict):
+                                    unwrapped_annotations.append(ann_data)
+                                    break
 
-    print(f"✅ Loaded annotations for {len(annotations_by_file)} files")
-    return annotations_by_file
+                    annotations_by_image[image_name] = unwrapped_annotations
+
+    print(f"✅ Loaded annotations for {len(annotations_by_image)} images")
+
+    # Debug: show first few entries
+    if len(annotations_by_image) > 0:
+        print(f"   Sample images: {list(annotations_by_image.keys())[:3]}")
+
+    return annotations_by_image
 
 def convert_pdf_to_images(pdf_path, output_dir, dpi=200):
     """Convert PDF to images"""
@@ -140,15 +166,18 @@ def parse_annotation(ann):
     # Extract bbox
     bbox = None
 
-    # Format 1: bbox as [x, y, width, height]
+    # Format 1: bbox as dict {"x": ..., "y": ..., "width": ..., "height": ...}
     if 'bbox' in ann:
-        bbox = ann['bbox']
-        if len(bbox) == 4:
-            x, y, w, h = bbox
+        bbox_data = ann['bbox']
+        if isinstance(bbox_data, dict) and all(k in bbox_data for k in ['x', 'y', 'width', 'height']):
+            x, y, w, h = bbox_data['x'], bbox_data['y'], bbox_data['width'], bbox_data['height']
+        # Format 2: bbox as array [x, y, width, height]
+        elif isinstance(bbox_data, (list, tuple)) and len(bbox_data) == 4:
+            x, y, w, h = bbox_data
         else:
             return None, None
 
-    # Format 2: points (polygon)
+    # Format 3: points (polygon)
     elif 'points' in ann:
         points = ann['points']
         xs = [p[0] if isinstance(p, (list, tuple)) else p['x'] for p in points]
@@ -156,12 +185,18 @@ def parse_annotation(ann):
         x, y = min(xs), min(ys)
         w, h = max(xs) - x, max(ys) - y
 
-    # Format 3: x, y, width, height as separate fields
+    # Format 4: x, y, width, height as separate fields (root level)
     elif all(k in ann for k in ['x', 'y', 'width', 'height']):
         x, y = ann['x'], ann['y']
         w, h = ann['width'], ann['height']
 
     else:
+        return None, None
+
+    # Ensure all values are valid numbers
+    try:
+        x, y, w, h = float(x), float(y), float(w), float(h)
+    except (ValueError, TypeError):
         return None, None
 
     return class_id, (x, y, w, h)
@@ -238,25 +273,11 @@ def prepare_dataset():
     images_with_labels = []
 
     for img_path in tqdm(all_image_paths, desc="Processing images"):
-        # Find matching annotations
-        img_name = img_path.name
-        pdf_name = img_path.stem.split('_page_')[0]
+        # Image name without extension: "pdf_name_page_3"
+        img_stem = img_path.stem
 
-        # Try multiple matching strategies
-        matching_anns = None
-
-        # Strategy 1: exact match
-        if img_name in annotations_by_file:
-            matching_anns = annotations_by_file[img_name]
-        # Strategy 2: PDF name match
-        elif pdf_name in annotations_by_file:
-            matching_anns = annotations_by_file[pdf_name]
-        # Strategy 3: partial match
-        else:
-            for ann_filename in annotations_by_file:
-                if pdf_name in ann_filename or ann_filename in pdf_name:
-                    matching_anns = annotations_by_file[ann_filename]
-                    break
+        # Try to find matching annotations
+        matching_anns = annotations_by_file.get(img_stem)
 
         if matching_anns is None or len(matching_anns) == 0:
             continue
