@@ -1,15 +1,24 @@
 """
-Complete Dataset Preparation Script for Kaggle
-Converts PDF + JSON annotations → YOLO format dataset
+Dataset Preparation for Kaggle - SIMPLIFIED VERSION
+Uses single selected_annotations.json file
 
-Steps:
-1. Convert PDFs to images
-2. Convert JSON annotations to YOLO format
-3. Create train/val split
-4. Generate data.yaml
+Usage:
+    python prepare_dataset_kaggle.py
 
-Run in Kaggle:
-!python prepare_dataset.py --pdf-dir /kaggle/input/your-dataset/pdf --annotations-dir /kaggle/input/your-dataset/annotations
+Expected structure:
+    /kaggle/input/armeta-docs/
+    ├── pdf/                          (45 PDF files)
+    └── selected_annotations.json     (single JSON with all annotations)
+
+Output:
+    /kaggle/working/data/
+    ├── train/
+    │   ├── images/
+    │   └── labels/
+    ├── val/
+    │   ├── images/
+    │   └── labels/
+    └── data.yaml
 """
 
 import json
@@ -19,7 +28,6 @@ from pathlib import Path
 from pdf2image import convert_from_path
 from tqdm import tqdm
 import yaml
-import argparse
 from sklearn.model_selection import train_test_split
 import shutil
 
@@ -27,234 +35,274 @@ import shutil
 CLASS_MAPPING = {
     'signature': 0,
     'stamp': 1,
-    'qr': 2
+    'qr': 2,
+    'qr_code': 2,  # alias
+    'seal': 1,      # alias for stamp
 }
 
+# Kaggle paths
+INPUT_DIR = Path('/kaggle/input/armeta-docs')
+OUTPUT_DIR = Path('/kaggle/working/data')
+
+PDF_DIR = INPUT_DIR / 'pdf'
+ANNOTATIONS_FILE = INPUT_DIR / 'selected_annotations.json'
+
+DPI = 200
+TRAIN_SPLIT = 0.8
+
 # ============= FUNCTIONS =============
+def load_annotations(json_path):
+    """Load selected_annotations.json"""
+    print(f"📖 Loading annotations from {json_path}...")
+
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # Expected format: {filename: {annotations: [...], ...}, ...}
+    # or list of {filename, annotations, ...}
+    # or COCO format {images: [...], annotations: [...]}
+
+    annotations_by_file = {}
+
+    # Handle COCO format
+    if 'images' in data and 'annotations' in data:
+        # COCO format
+        images_dict = {img['id']: img['file_name'] for img in data['images']}
+
+        for ann in data['annotations']:
+            img_id = ann['image_id']
+            filename = images_dict.get(img_id, f"unknown_{img_id}")
+
+            if filename not in annotations_by_file:
+                annotations_by_file[filename] = []
+
+            annotations_by_file[filename].append(ann)
+
+    # Handle dict format {filename: data}
+    elif isinstance(data, dict):
+        for filename, file_data in data.items():
+            if isinstance(file_data, dict) and 'annotations' in file_data:
+                annotations_by_file[filename] = file_data['annotations']
+            elif isinstance(file_data, list):
+                annotations_by_file[filename] = file_data
+
+    # Handle list format
+    elif isinstance(data, list):
+        for item in data:
+            if 'filename' in item or 'image' in item:
+                filename = item.get('filename') or item.get('image')
+                annotations = item.get('annotations') or item.get('objects') or []
+                annotations_by_file[filename] = annotations
+
+    print(f"✅ Loaded annotations for {len(annotations_by_file)} files")
+    return annotations_by_file
+
 def convert_pdf_to_images(pdf_path, output_dir, dpi=200):
-    """
-    Convert PDF to images (one per page)
-
-    Args:
-        pdf_path: Path to PDF file
-        output_dir: Directory to save images
-        dpi: Resolution (higher = better quality but slower)
-
-    Returns:
-        List of saved image paths
-    """
+    """Convert PDF to images"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Convert PDF to images
-    images = convert_from_path(pdf_path, dpi=dpi)
+    images = convert_from_path(str(pdf_path), dpi=dpi)
 
     saved_paths = []
     pdf_name = Path(pdf_path).stem
 
     for i, img in enumerate(images):
-        # Save as PNG
         img_path = output_dir / f"{pdf_name}_page_{i+1}.png"
         img.save(img_path, 'PNG')
         saved_paths.append(img_path)
 
     return saved_paths
 
-def convert_json_to_yolo(json_path, image_width, image_height, output_path):
-    """
-    Convert JSON annotation to YOLO format
+def parse_annotation(ann):
+    """Parse single annotation to extract class and bbox"""
+    # Extract class
+    class_name = None
+    for key in ['label', 'category', 'class', 'name', 'category_name']:
+        if key in ann:
+            class_name = str(ann[key]).lower()
+            break
 
-    YOLO format: <class_id> <x_center> <y_center> <width> <height>
-    All values normalized to [0, 1]
+    if not class_name:
+        return None, None
 
-    Args:
-        json_path: Path to JSON annotation file
-        image_width: Image width in pixels
-        image_height: Image height in pixels
-        output_path: Path to save YOLO .txt file
-    """
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    # Map to class ID
+    class_id = None
+    for key, value in CLASS_MAPPING.items():
+        if key in class_name:
+            class_id = value
+            break
 
+    if class_id is None:
+        return None, None
+
+    # Extract bbox
+    bbox = None
+
+    # Format 1: bbox as [x, y, width, height]
+    if 'bbox' in ann:
+        bbox = ann['bbox']
+        if len(bbox) == 4:
+            x, y, w, h = bbox
+        else:
+            return None, None
+
+    # Format 2: points (polygon)
+    elif 'points' in ann:
+        points = ann['points']
+        xs = [p[0] if isinstance(p, (list, tuple)) else p['x'] for p in points]
+        ys = [p[1] if isinstance(p, (list, tuple)) else p['y'] for p in points]
+        x, y = min(xs), min(ys)
+        w, h = max(xs) - x, max(ys) - y
+
+    # Format 3: x, y, width, height as separate fields
+    elif all(k in ann for k in ['x', 'y', 'width', 'height']):
+        x, y = ann['x'], ann['y']
+        w, h = ann['width'], ann['height']
+
+    else:
+        return None, None
+
+    return class_id, (x, y, w, h)
+
+def convert_to_yolo_format(annotations, img_width, img_height):
+    """Convert annotations to YOLO format"""
     yolo_lines = []
 
-    # Handle different JSON formats
-    annotations = []
-
-    # Format 1: COCO-like format
-    if 'annotations' in data:
-        annotations = data['annotations']
-    # Format 2: Direct list
-    elif isinstance(data, list):
-        annotations = data
-    # Format 3: Custom format with 'objects' or 'shapes'
-    elif 'objects' in data:
-        annotations = data['objects']
-    elif 'shapes' in data:
-        annotations = data['shapes']
-
     for ann in annotations:
-        # Extract class name
-        class_name = None
-        if 'label' in ann:
-            class_name = ann['label'].lower()
-        elif 'category' in ann:
-            class_name = ann['category'].lower()
-        elif 'class' in ann:
-            class_name = ann['class'].lower()
-        elif 'name' in ann:
-            class_name = ann['name'].lower()
+        class_id, bbox = parse_annotation(ann)
 
-        # Map to class ID
-        class_id = None
-        for key, value in CLASS_MAPPING.items():
-            if class_name and key in class_name:
-                class_id = value
-                break
+        if class_id is None or bbox is None:
+            continue
 
-        if class_id is None:
-            continue  # Skip unknown classes
+        x, y, w, h = bbox
 
-        # Extract bounding box
-        bbox = None
+        # Convert to YOLO format (normalized)
+        x_center = (x + w / 2) / img_width
+        y_center = (y + h / 2) / img_height
+        norm_width = w / img_width
+        norm_height = h / img_height
 
-        # Format 1: bbox as [x, y, width, height]
-        if 'bbox' in ann:
-            bbox = ann['bbox']
-            x, y, w, h = bbox
-        # Format 2: points (polygon) - compute bbox
-        elif 'points' in ann:
-            points = ann['points']
-            xs = [p[0] for p in points]
-            ys = [p[1] for p in points]
-            x, y = min(xs), min(ys)
-            w, h = max(xs) - x, max(ys) - y
-        # Format 3: x, y, width, height as separate fields
-        elif 'x' in ann and 'width' in ann:
-            x, y = ann['x'], ann['y']
-            w, h = ann['width'], ann['height']
-        else:
-            continue  # Skip if no bbox info
-
-        # Convert to YOLO format (normalized x_center, y_center, width, height)
-        x_center = (x + w / 2) / image_width
-        y_center = (y + h / 2) / image_height
-        norm_width = w / image_width
-        norm_height = h / image_height
-
-        # Validate coordinates (must be in [0, 1])
+        # Validate
         if not (0 <= x_center <= 1 and 0 <= y_center <= 1 and
                 0 < norm_width <= 1 and 0 < norm_height <= 1):
-            print(f"Warning: Invalid bbox in {json_path}: {ann}")
             continue
 
         yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {norm_width:.6f} {norm_height:.6f}")
 
-    # Write YOLO format file
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w') as f:
-        f.write('\n'.join(yolo_lines))
+    return yolo_lines
 
-    return len(yolo_lines)
+def prepare_dataset():
+    """Main pipeline"""
+    print("=" * 70)
+    print("🚀 DATASET PREPARATION FOR KAGGLE")
+    print("=" * 70)
 
-def prepare_yolo_dataset(pdf_dir, annotations_dir, output_dir, train_split=0.8, dpi=200):
-    """
-    Complete pipeline: PDF + JSON → YOLO dataset
+    # Check paths
+    if not PDF_DIR.exists():
+        raise FileNotFoundError(f"PDF directory not found: {PDF_DIR}")
 
-    Args:
-        pdf_dir: Directory with PDF files
-        annotations_dir: Directory with JSON annotation files
-        output_dir: Output directory for YOLO dataset
-        train_split: Train/val split ratio
-        dpi: PDF conversion DPI
-    """
-    pdf_dir = Path(pdf_dir)
-    annotations_dir = Path(annotations_dir)
-    output_dir = Path(output_dir)
+    if not ANNOTATIONS_FILE.exists():
+        raise FileNotFoundError(f"Annotations file not found: {ANNOTATIONS_FILE}")
 
-    # Create output structure
-    images_dir = output_dir / 'images_temp'
-    images_dir.mkdir(parents=True, exist_ok=True)
+    # Load annotations
+    annotations_by_file = load_annotations(ANNOTATIONS_FILE)
 
-    print("=" * 60)
+    # Create temp directories
+    images_temp = OUTPUT_DIR / 'images_temp'
+    labels_temp = OUTPUT_DIR / 'labels_temp'
+    images_temp.mkdir(parents=True, exist_ok=True)
+    labels_temp.mkdir(parents=True, exist_ok=True)
+
+    print("\n" + "=" * 70)
     print("📄 STEP 1: Converting PDFs to images...")
-    print("=" * 60)
+    print("=" * 70)
 
-    # Convert all PDFs
-    pdf_files = sorted(pdf_dir.glob('*.pdf'))
+    pdf_files = sorted(PDF_DIR.glob('*.pdf'))
+    print(f"Found {len(pdf_files)} PDF files")
+
     all_image_paths = []
 
     for pdf_path in tqdm(pdf_files, desc="Converting PDFs"):
-        img_paths = convert_pdf_to_images(pdf_path, images_dir, dpi=dpi)
+        img_paths = convert_pdf_to_images(pdf_path, images_temp, dpi=DPI)
         all_image_paths.extend(img_paths)
 
-    print(f"✅ Converted {len(pdf_files)} PDFs → {len(all_image_paths)} images")
+    print(f"✅ Created {len(all_image_paths)} images")
 
-    print("\n" + "=" * 60)
-    print("📝 STEP 2: Converting JSON annotations to YOLO format...")
-    print("=" * 60)
+    print("\n" + "=" * 70)
+    print("📝 STEP 2: Creating YOLO labels...")
+    print("=" * 70)
 
-    # Convert annotations
-    labels_dir = output_dir / 'labels_temp'
-    labels_dir.mkdir(parents=True, exist_ok=True)
-
-    annotation_files = sorted(annotations_dir.glob('*.json'))
     total_annotations = 0
+    images_with_labels = []
 
-    for json_path in tqdm(annotation_files, desc="Converting annotations"):
-        # Find corresponding image
-        json_name = json_path.stem
+    for img_path in tqdm(all_image_paths, desc="Processing images"):
+        # Find matching annotations
+        img_name = img_path.name
+        pdf_name = img_path.stem.split('_page_')[0]
 
-        # Try to match image by name
-        matching_images = list(images_dir.glob(f"{json_name}*.png"))
+        # Try multiple matching strategies
+        matching_anns = None
 
-        if not matching_images:
-            # Try without page suffix
-            base_name = json_name.replace('_page_1', '').replace('_page_2', '')
-            matching_images = list(images_dir.glob(f"{base_name}*.png"))
+        # Strategy 1: exact match
+        if img_name in annotations_by_file:
+            matching_anns = annotations_by_file[img_name]
+        # Strategy 2: PDF name match
+        elif pdf_name in annotations_by_file:
+            matching_anns = annotations_by_file[pdf_name]
+        # Strategy 3: partial match
+        else:
+            for ann_filename in annotations_by_file:
+                if pdf_name in ann_filename or ann_filename in pdf_name:
+                    matching_anns = annotations_by_file[ann_filename]
+                    break
 
-        for img_path in matching_images:
-            # Get image dimensions
-            img = cv2.imread(str(img_path))
-            if img is None:
-                continue
+        if matching_anns is None or len(matching_anns) == 0:
+            continue
 
-            h, w = img.shape[:2]
+        # Get image dimensions
+        img = cv2.imread(str(img_path))
+        if img is None:
+            continue
 
-            # Convert to YOLO format
-            label_path = labels_dir / f"{img_path.stem}.txt"
-            num_annotations = convert_json_to_yolo(json_path, w, h, label_path)
-            total_annotations += num_annotations
+        h, w = img.shape[:2]
 
-    print(f"✅ Created {len(list(labels_dir.glob('*.txt')))} label files with {total_annotations} annotations")
+        # Convert to YOLO format
+        yolo_lines = convert_to_yolo_format(matching_anns, w, h)
 
-    print("\n" + "=" * 60)
+        if len(yolo_lines) == 0:
+            continue
+
+        # Save label file
+        label_path = labels_temp / f"{img_path.stem}.txt"
+        with open(label_path, 'w') as f:
+            f.write('\n'.join(yolo_lines))
+
+        total_annotations += len(yolo_lines)
+        images_with_labels.append((img_path, label_path))
+
+    print(f"✅ Created {len(images_with_labels)} label files with {total_annotations} annotations")
+
+    if len(images_with_labels) == 0:
+        raise ValueError("No images with labels found! Check annotation file format.")
+
+    print("\n" + "=" * 70)
     print("🔀 STEP 3: Creating train/val split...")
-    print("=" * 60)
+    print("=" * 70)
 
-    # Get all images with labels
-    label_files = sorted(labels_dir.glob('*.txt'))
-    image_label_pairs = []
-
-    for label_path in label_files:
-        img_path = images_dir / f"{label_path.stem}.png"
-        if img_path.exists():
-            image_label_pairs.append((img_path, label_path))
-
-    # Split
     train_pairs, val_pairs = train_test_split(
-        image_label_pairs,
-        train_size=train_split,
+        images_with_labels,
+        train_size=TRAIN_SPLIT,
         random_state=42,
         shuffle=True
     )
 
-    print(f"📊 Train: {len(train_pairs)} images, Val: {len(val_pairs)} images")
+    print(f"Train: {len(train_pairs)}, Val: {len(val_pairs)}")
 
-    # Create final directory structure
+    # Create final structure
     for split, pairs in [('train', train_pairs), ('val', val_pairs)]:
-        split_img_dir = output_dir / split / 'images'
-        split_lbl_dir = output_dir / split / 'labels'
+        split_img_dir = OUTPUT_DIR / split / 'images'
+        split_lbl_dir = OUTPUT_DIR / split / 'labels'
         split_img_dir.mkdir(parents=True, exist_ok=True)
         split_lbl_dir.mkdir(parents=True, exist_ok=True)
 
@@ -262,61 +310,36 @@ def prepare_yolo_dataset(pdf_dir, annotations_dir, output_dir, train_split=0.8, 
             shutil.copy(img_path, split_img_dir / img_path.name)
             shutil.copy(lbl_path, split_lbl_dir / lbl_path.name)
 
-    # Clean up temp directories
-    shutil.rmtree(images_dir)
-    shutil.rmtree(labels_dir)
+    # Clean up temp
+    shutil.rmtree(images_temp)
+    shutil.rmtree(labels_temp)
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("📋 STEP 4: Creating data.yaml...")
-    print("=" * 60)
+    print("=" * 70)
 
-    # Create data.yaml
     data_yaml = {
-        'path': str(output_dir.absolute()),
+        'path': str(OUTPUT_DIR.absolute()),
         'train': 'train/images',
         'val': 'val/images',
         'nc': 3,
         'names': {0: 'signature', 1: 'stamp', 2: 'qr'}
     }
 
-    yaml_path = output_dir / 'data.yaml'
+    yaml_path = OUTPUT_DIR / 'data.yaml'
     with open(yaml_path, 'w') as f:
         yaml.dump(data_yaml, f, default_flow_style=False)
 
     print(f"✅ Created {yaml_path}")
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("✨ DATASET READY!")
-    print("=" * 60)
-    print(f"📁 Location: {output_dir}")
-    print(f"📊 Train images: {len(train_pairs)}")
-    print(f"📊 Val images: {len(val_pairs)}")
-    print(f"📝 Total annotations: {total_annotations}")
-    print(f"\n🚀 Next step: python train_yolov8s_optimized.py")
-
-# ============= MAIN =============
-def main():
-    parser = argparse.ArgumentParser(description='Prepare YOLO dataset from PDF + JSON')
-    parser.add_argument('--pdf-dir', type=str, required=True,
-                       help='Directory with PDF files')
-    parser.add_argument('--annotations-dir', type=str, required=True,
-                       help='Directory with JSON annotations')
-    parser.add_argument('--output-dir', type=str, default='./data',
-                       help='Output directory for YOLO dataset')
-    parser.add_argument('--train-split', type=float, default=0.8,
-                       help='Train/val split ratio')
-    parser.add_argument('--dpi', type=int, default=200,
-                       help='PDF to image DPI (higher = better quality)')
-
-    args = parser.parse_args()
-
-    prepare_yolo_dataset(
-        pdf_dir=args.pdf_dir,
-        annotations_dir=args.annotations_dir,
-        output_dir=args.output_dir,
-        train_split=args.train_split,
-        dpi=args.dpi
-    )
+    print("=" * 70)
+    print(f"📁 Location: {OUTPUT_DIR}")
+    print(f"📊 Train: {len(train_pairs)} images")
+    print(f"📊 Val: {len(val_pairs)} images")
+    print(f"📝 Annotations: {total_annotations}")
+    print(f"\n🚀 Next: python train_yolov8s_optimized.py")
 
 if __name__ == '__main__':
-    main()
+    prepare_dataset()
