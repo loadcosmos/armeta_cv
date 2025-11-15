@@ -22,7 +22,7 @@ CONFIG = {
     'model': 'yolov8s.pt',  # ⭐ CHANGED from yolov8n.pt
 
     # Data
-    'data_yaml': '/content/data/data.yaml',  # Update path if needed
+    'data_yaml': '/kaggle/working/data/data.yaml',  # Kaggle path (change if using Colab)
 
     # Training params
     'epochs': 120,           # ⬆️ Increased (more capacity)
