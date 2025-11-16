@@ -97,9 +97,7 @@ def check_project_files():
         ],
         "Документация": [
             "README.md",
-            "QUICK_START.md",
             "SETUP.md",
-            "KILLER_FEATURES.md",
         ],
     }
 
