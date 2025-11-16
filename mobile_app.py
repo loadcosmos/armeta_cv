@@ -32,19 +32,25 @@ try:
     from qr_decoder import QRDecoder, format_qr_data
     from validator import DocumentValidator, ContractValidator, format_validation_report, LicenseValidator
     from html_reporter import HTMLReporter
-except ImportError:
-    st.error("⚠️ Please install all requirements: pip install -r requirements.txt")
+except ImportError as e:
+    st.error(f"⚠️ Import error: {e}")
+    st.error("Please install all requirements: pip install -r requirements.txt")
+    st.info("💡 Make sure you have installed the required packages before running the app")
     st.stop()
 
 # Cache model loading for better performance
 @st.cache_resource
 def load_models():
     """Load and cache ML models"""
-    detector = DocumentDetector(conf_threshold=0.25, iou_threshold=0.45)
-    qr_decoder = QRDecoder()
-    validator = DocumentValidator()
-    reporter = HTMLReporter()
-    return detector, qr_decoder, validator, reporter
+    try:
+        detector = DocumentDetector(conf_threshold=0.25, iou_threshold=0.45)
+        qr_decoder = QRDecoder()
+        validator = DocumentValidator()
+        reporter = HTMLReporter()
+        return detector, qr_decoder, validator, reporter
+    except Exception as e:
+        st.error(f"❌ Model loading failed during initialization: {e}")
+        raise e
 
 # Page config
 st.set_page_config(
@@ -133,25 +139,30 @@ try:
     st.session_state.reporter = reporter
 except Exception as e:
     st.error(f"❌ Failed to load model: {e}")
-    st.info("💡 Make sure best.pt is in the correct location")
+    st.info("💡 Make sure best.pt is in the correct location and all dependencies are installed")
+    st.info("🔧 Install requirements with: pip install -r requirements.txt")
     st.stop()
 
 def process_image(image):
     """Process single image and return results"""
-    # Convert PIL to OpenCV
-    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    try:
+        # Convert PIL to OpenCV
+        img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    # Detect
-    detections = st.session_state.detector.detect_image(img_cv)
+        # Detect
+        detections = st.session_state.detector.detect_image(img_cv)
 
-    # Decode QR
-    detections = st.session_state.qr_decoder.decode_all_qr_codes(img_cv, detections)
+        # Decode QR
+        detections = st.session_state.qr_decoder.decode_all_qr_codes(img_cv, detections)
 
-    # Visualize
-    img_vis = st.session_state.detector.visualize_detections(img_cv, detections)
-    img_vis = cv2.cvtColor(img_vis, cv2.COLOR_BGR2RGB)
+        # Visualize
+        img_vis = st.session_state.detector.visualize_detections(img_cv, detections)
+        img_vis = cv2.cvtColor(img_vis, cv2.COLOR_BGR2RGB)
 
-    return detections, Image.fromarray(img_vis)
+        return detections, Image.fromarray(img_vis)
+    except Exception as e:
+        st.error(f"❌ Error processing image: {e}")
+        return [], image  # Return original image if processing fails
 
 def images_to_pdf(images, output_path):
     """Convert multiple images to PDF"""
@@ -192,12 +203,16 @@ with st.sidebar:
     )
 
     # Update validator
-    if validator_type == "Contract":
-        st.session_state.validator = ContractValidator()
-    elif validator_type == "License":
-        st.session_state.validator = LicenseValidator()
-    else:
-        st.session_state.validator = DocumentValidator()
+    try:
+        if validator_type == "Contract":
+            st.session_state.validator = ContractValidator()
+        elif validator_type == "License":
+            st.session_state.validator = LicenseValidator()
+        else:
+            st.session_state.validator = DocumentValidator()
+    except Exception as e:
+        st.error(f"❌ Error initializing validator: {e}")
+        st.session_state.validator = DocumentValidator()  # Fallback to default
 
     st.markdown("---")
 
@@ -368,41 +383,44 @@ with tab3:
 
         with col2:
             if st.button("✅ Validate Document"):
-                # Create results structure
-                results = {
-                    'pdf': 'scanned_document.pdf',
-                    'total_pages': len(st.session_state.pages),
-                    'pages': []
-                }
-
-                for i, page in enumerate(st.session_state.pages, 1):
-                    results['pages'].append({
-                        'page': i,
-                        'detections': page['detections'],
-                        'summary': {}
-                    })
-
-                # Validate
-                validation = st.session_state.validator.validate(results)
-
-                # Display validation
-                status = validation['status']
-                if status == 'valid':
-                    st.markdown(f'<div class="valid">✅ <strong>Document is VALID</strong></div>', unsafe_allow_html=True)
-                elif status == 'warning':
-                    st.markdown(f'<div class="warning">⚠️ <strong>Document has WARNINGS</strong></div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="invalid">❌ <strong>Document is INVALID</strong></div>', unsafe_allow_html=True)
-
-                if validation['errors']:
-                    st.error("**Errors:**")
-                    for err in validation['errors']:
-                        st.write(f"- {err['description']}")
-
-                if validation['warnings']:
-                    st.warning("**Warnings:**")
-                    for warn in validation['warnings']:
-                        st.write(f"- {warn['description']}")
+                try:
+                    # Create results structure
+                    results = {
+                        'pdf': 'scanned_document.pdf',
+                        'total_pages': len(st.session_state.pages),
+                        'pages': []
+                    }
+        
+                    for i, page in enumerate(st.session_state.pages, 1):
+                        results['pages'].append({
+                            'page': i,
+                            'detections': page['detections'],
+                            'summary': {}
+                        })
+        
+                    # Validate
+                    validation = st.session_state.validator.validate(results)
+        
+                    # Display validation
+                    status = validation['status']
+                    if status == 'valid':
+                        st.markdown(f'<div class="valid">✅ <strong>Document is VALID</strong></div>', unsafe_allow_html=True)
+                    elif status == 'warning':
+                        st.markdown(f'<div class="warning">⚠️ <strong>Document has WARNINGS</strong></div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="invalid">❌ <strong>Document is INVALID</strong></div>', unsafe_allow_html=True)
+        
+                    if validation['errors']:
+                        st.error("**Errors:**")
+                        for err in validation['errors']:
+                            st.write(f"- {err['description']}")
+                    
+                    if validation['warnings']:
+                        st.warning("**Warnings:**")
+                        for warn in validation['warnings']:
+                            st.write(f"- {warn['description']}")
+                except Exception as e:
+                    st.error(f"❌ Error during validation: {e}")
 
         with col3:
             if st.button("📥 Download PDF"):

@@ -17,7 +17,7 @@ source venv/bin/activate  # Linux/Mac
 # or: venv\Scripts\activate  # Windows
 
 # Install Python dependencies
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Step 2: System Dependencies
