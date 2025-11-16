@@ -23,8 +23,26 @@ from datetime import datetime
 from typing import List, Dict, Tuple
 from tqdm import tqdm
 
-# Default model path
-DEFAULT_MODEL = 'runs/detect/train2/weights/best.pt'
+# Default model paths (will try in order)
+DEFAULT_MODEL_PATHS = [
+    'best.pt',                                    # Same directory
+    'models/best.pt',                             # models folder
+    'runs/detect/train2/weights/best.pt',        # Training output
+    'weights/best.pt',                            # weights folder
+]
+
+def find_model(model_path=None):
+    """Find model file in common locations"""
+    if model_path and Path(model_path).exists():
+        return model_path
+
+    for path in DEFAULT_MODEL_PATHS:
+        if Path(path).exists():
+            return path
+
+    return DEFAULT_MODEL_PATHS[0]  # Return first path as default
+
+DEFAULT_MODEL = find_model()
 
 CLASS_NAMES = {0: 'signature', 1: 'stamp', 2: 'qr'}
 COLORS = {
