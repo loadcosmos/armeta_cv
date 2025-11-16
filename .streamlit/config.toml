@@ -1,8 +1,9 @@
 [server]
 # Server configuration
 maxUploadSize = 10  # Max file size in MB
-enableCORS = false
+enableCORS = true
 enableXsrfProtection = true
+headless = true
 
 [browser]
 # Browser configuration
