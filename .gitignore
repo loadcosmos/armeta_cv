@@ -1,20 +1,15 @@
+best.pt
+*.ipynb
+*.pt
+runs/
+runs/**/*
 venv/
+.venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-.venv/
-.ENV
-.venv.bak/
-env.bak/
-case/
+.env
+.pytest_cache/
+.coverage
+*.so
+.DS_Store
 
-# Windows Zone.Identifier files
-*:Zone.Identifier
-
-# Test outputs
-test_results/
-runs/
-env.bak/case/
