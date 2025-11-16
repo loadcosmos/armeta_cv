@@ -188,23 +188,8 @@ with st.sidebar:
     validator_type = st.selectbox(
         "📋 Document Type",
         ["General", "Contract", "License"],
-        help="Validation rules for document type"
+        help="Choose document type for validation"
     )
-
-    conf_threshold = st.slider(
-        "🎯 Confidence Threshold",
-        0.1, 0.9, 0.25, 0.05,
-        help="Lower = more detections (may include false positives)"
-    )
-
-    iou_threshold = st.slider(
-        "🔲 Overlap Threshold",
-        0.1, 0.9, 0.45, 0.05,
-        help="Lower = allow more overlapping detections"
-    )
-
-    st.session_state.detector.conf_threshold = conf_threshold
-    st.session_state.detector.iou_threshold = iou_threshold
 
     # Update validator
     if validator_type == "Contract":
@@ -215,13 +200,32 @@ with st.sidebar:
         st.session_state.validator = DocumentValidator()
 
     st.markdown("---")
-    st.markdown("### 📊 Model Info")
+
+    # Advanced settings (collapsed by default)
+    with st.expander("🔧 Advanced Settings", expanded=False):
+        conf_threshold = st.slider(
+            "Detection Sensitivity",
+            0.1, 0.9, 0.25, 0.05,
+            help="Lower = find more objects (may include false positives)"
+        )
+
+        iou_threshold = st.slider(
+            "Duplicate Filter",
+            0.1, 0.9, 0.45, 0.05,
+            help="Lower = allow more overlapping detections"
+        )
+
+        st.session_state.detector.conf_threshold = conf_threshold
+        st.session_state.detector.iou_threshold = iou_threshold
+
+    st.markdown("---")
+    st.markdown("### 📊 Model Performance")
     st.markdown("""
-    **YOLOv8s**
-    - mAP50: 88.1%
-    - QR: 99.5% (100% recall) ⭐
-    - Stamp: 87.0%
-    - Signature: 77.6%
+    **YOLOv8s Model**
+    - Overall Accuracy: **88.1%**
+    - QR Detection: **99.5%** ⭐
+    - Stamp Detection: **87.0%**
+    - Signature Detection: **77.6%**
     """)
 
 # Main content
