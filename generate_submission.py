@@ -92,8 +92,10 @@ def main():
             # Process PDF with enhanced features
             results = processor.process_pdf(
                 pdf_path=str(pdf_path),
-                validator_type='general',
-                dpi=args.dpi
+                dpi=args.dpi,
+                output_dir=None,
+                generate_html=False,
+                save_visualizations=False
             )
 
             # Add relative path for easier identification
