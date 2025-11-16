@@ -14,6 +14,8 @@ from kaggle.hybrid.inference import (
     COLORS
 )
 
+YOLODocumentDetector = DocumentDetector
+
 __all__ = [
     'DocumentDetector',
     'YOLODocumentDetector',
