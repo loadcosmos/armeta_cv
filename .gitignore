@@ -8,4 +8,13 @@ env/
 .venv/
 .ENV
 .venv.bak/
+env.bak/
+case/
+
+# Windows Zone.Identifier files
+*:Zone.Identifier
+
+# Test outputs
+test_results/
+runs/
 env.bak/case/
