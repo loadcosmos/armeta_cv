@@ -29,6 +29,25 @@ DEFAULT_MODEL_PATHS = [
     'models/best.pt',                             # models folder
     'runs/detect/train2/weights/best.pt',        # Training output
     'weights/best.pt',                            # weights folder
+# Import everything from the actual implementation
+from kaggle.hybrid.inference import (
+    DocumentDetector,
+    YOLODocumentDetector,
+    find_model,
+    DEFAULT_MODEL,
+    CLASS_NAMES,
+    COLORS
+)
+
+YOLODocumentDetector = DocumentDetector
+
+__all__ = [
+    'DocumentDetector',
+    'YOLODocumentDetector',
+    'find_model',
+    'DEFAULT_MODEL',
+    'CLASS_NAMES',
+    'COLORS'
 ]
 
 def find_model(model_path=None):
