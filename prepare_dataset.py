@@ -114,7 +114,12 @@ def load_annotations(json_path):
                                     unwrapped_annotations.append(ann_data)
                                     break
 
-                    annotations_by_image[image_name] = unwrapped_annotations
+                    # Store annotations AND page_size for proper scaling
+                    page_size = page_data.get('page_size', {})
+                    annotations_by_image[image_name] = {
+                        'annotations': unwrapped_annotations,
+                        'page_size': page_size
+                    }
 
     print(f"✅ Loaded annotations for {len(annotations_by_image)} images")
 
@@ -201,9 +206,29 @@ def parse_annotation(ann):
 
     return class_id, (x, y, w, h)
 
-def convert_to_yolo_format(annotations, img_width, img_height):
-    """Convert annotations to YOLO format"""
+def convert_to_yolo_format(annotations, img_width, img_height, json_page_size=None):
+    """
+    Convert annotations to YOLO format
+
+    Args:
+        annotations: List of annotation dicts
+        img_width: Actual image width (after PDF conversion)
+        img_height: Actual image height (after PDF conversion)
+        json_page_size: Original page size from JSON annotations (dict with 'width', 'height')
+    """
     yolo_lines = []
+
+    # Calculate scaling factors if JSON page size is different from actual image size
+    scale_x = 1.0
+    scale_y = 1.0
+
+    if json_page_size and 'width' in json_page_size and 'height' in json_page_size:
+        json_width = json_page_size['width']
+        json_height = json_page_size['height']
+
+        if json_width > 0 and json_height > 0:
+            scale_x = img_width / json_width
+            scale_y = img_height / json_height
 
     for ann in annotations:
         class_id, bbox = parse_annotation(ann)
@@ -212,6 +237,12 @@ def convert_to_yolo_format(annotations, img_width, img_height):
             continue
 
         x, y, w, h = bbox
+
+        # Scale coordinates from JSON size to actual image size
+        x = x * scale_x
+        y = y * scale_y
+        w = w * scale_x
+        h = h * scale_y
 
         # Convert to YOLO format (normalized)
         x_center = (x + w / 2) / img_width
@@ -276,10 +307,22 @@ def prepare_dataset():
         # Image name without extension: "pdf_name_page_3"
         img_stem = img_path.stem
 
-        # Try to find matching annotations
-        matching_anns = annotations_by_file.get(img_stem)
+        # Try to find matching annotations data (contains 'annotations' and 'page_size')
+        ann_data = annotations_by_file.get(img_stem)
 
-        if matching_anns is None or len(matching_anns) == 0:
+        if ann_data is None:
+            continue
+
+        # Extract annotations and page_size
+        if isinstance(ann_data, dict):
+            matching_anns = ann_data.get('annotations', [])
+            page_size = ann_data.get('page_size', {})
+        else:
+            # Fallback for old format (if any)
+            matching_anns = ann_data
+            page_size = {}
+
+        if len(matching_anns) == 0:
             continue
 
         # Get image dimensions
@@ -289,8 +332,8 @@ def prepare_dataset():
 
         h, w = img.shape[:2]
 
-        # Convert to YOLO format
-        yolo_lines = convert_to_yolo_format(matching_anns, w, h)
+        # Convert to YOLO format with scaling
+        yolo_lines = convert_to_yolo_format(matching_anns, w, h, json_page_size=page_size)
 
         if len(yolo_lines) == 0:
             continue
