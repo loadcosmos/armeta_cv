@@ -336,5 +336,9 @@ def main():
     print(f"\n✓ Results saved to: {output_dir}")
 
 
+# Alias for backward compatibility
+YOLODocumentDetector = DocumentDetector
+
+
 if __name__ == '__main__':
     main()
