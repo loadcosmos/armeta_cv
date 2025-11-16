@@ -260,13 +260,13 @@ with tab1:
 
         with col1:
             st.markdown("#### Original")
-            st.image(image, use_column_width=True)
+            st.image(image, use_container_width=True)
 
         with col2:
             st.markdown("#### Detection Result")
             with st.spinner("🔍 Analyzing..."):
                 detections, img_vis = process_image(image)
-                st.image(img_vis, use_column_width=True)
+                st.image(img_vis, use_container_width=True)
 
         # Display results
         if detections:
@@ -329,13 +329,13 @@ with tab2:
 
             with col1:
                 st.markdown("#### Original")
-                st.image(image, use_column_width=True)
+                st.image(image, use_container_width=True)
 
             with col2:
                 st.markdown("#### Detection Result")
                 with st.spinner("🔍 Analyzing..."):
                     detections, img_vis = process_image(image)
-                    st.image(img_vis, use_column_width=True)
+                    st.image(img_vis, use_container_width=True)
 
             if detections:
                 st.markdown("### 📋 Detection Results")
@@ -362,9 +362,9 @@ with tab3:
             with st.expander(f"Page {i}"):
                 col1, col2 = st.columns([1, 1])
                 with col1:
-                    st.image(page['image'], caption=f"Original - Page {i}", use_column_width=True)
+                    st.image(page['image'], caption=f"Original - Page {i}", use_container_width=True)
                 with col2:
-                    st.image(page['visualized'], caption=f"Detected - Page {i}", use_column_width=True)
+                    st.image(page['visualized'], caption=f"Detected - Page {i}", use_container_width=True)
 
                 # Detections
                 counts = {}
