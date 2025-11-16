@@ -404,7 +404,7 @@ def prepare_dataset():
     print(f"📊 Train: {len(train_pairs)} images")
     print(f"📊 Val: {len(val_pairs)} images")
     print(f"📝 Annotations: {total_annotations}")
-    print(f"\n🚀 Next: python train_yolov8s_optimized.py")
+    print(f"\n🚀 Next: python kaggle/training/train_yolov8s_optimized.py")
 
 if __name__ == '__main__':
     prepare_dataset()

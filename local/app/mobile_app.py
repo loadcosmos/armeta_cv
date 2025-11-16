@@ -27,10 +27,10 @@ import json
 
 # Import our modules
 try:
-    from inference import DocumentDetector, find_model
-    from qr_decoder import QRDecoder, format_qr_data
-    from validator import DocumentValidator, ContractValidator, format_validation_report
-    from html_reporter import HTMLReporter
+    from kaggle.hybrid.inference import DocumentDetector, find_model
+    from kaggle.hybrid.qr_decoder import QRDecoder, format_qr_data
+    from kaggle.hybrid.validator import DocumentValidator, ContractValidator, format_validation_report
+    from kaggle.hybrid.html_reporter import HTMLReporter
 except ImportError:
     st.error("⚠️ Please install all requirements: pip install -r requirements.txt")
     st.stop()
@@ -197,7 +197,7 @@ with st.sidebar:
     if validator_type == "Contract":
         st.session_state.validator = ContractValidator()
     elif validator_type == "License":
-        from validator import LicenseValidator
+        from kaggle.hybrid.validator import LicenseValidator
         st.session_state.validator = LicenseValidator()
     else:
         st.session_state.validator = DocumentValidator()

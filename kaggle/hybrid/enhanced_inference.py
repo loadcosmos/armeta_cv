@@ -22,10 +22,10 @@ from typing import List, Dict
 from tqdm import tqdm
 import json
 
-from inference import DocumentDetector, find_model
-from qr_decoder import QRDecoder
-from validator import DocumentValidator, ContractValidator, LicenseValidator, format_validation_report
-from html_reporter import HTMLReporter
+from .inference import DocumentDetector, find_model
+from .qr_decoder import QRDecoder
+from .validator import DocumentValidator, ContractValidator, LicenseValidator, format_validation_report
+from .html_reporter import HTMLReporter
 
 
 class EnhancedDocumentProcessor:

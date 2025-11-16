@@ -47,7 +47,7 @@ def prepare_dataset(args):
     
     if args.kaggle:
         # Kaggle specific paths
-        cmd = "python prepare_dataset.py"
+        cmd = "python kaggle/dataset/prepare_dataset.py"
         success, output = run_command(cmd, "Preparing dataset for Kaggle")
     else:
         # Local paths - need to make sure they exist
@@ -56,7 +56,7 @@ def prepare_dataset(args):
             print("❌ 'data' directory doesn't exist. Please create it with 'pdf' and 'annotations' subdirectories.")
             return False
         
-        cmd = "python prepare_dataset.py"
+        cmd = "python kaggle/dataset/prepare_dataset.py"
         success, output = run_command(cmd, "Preparing dataset locally")
     
     if success:
@@ -73,7 +73,7 @@ def train_model(args):
     print("🏋️  STEP 2: Training Model")
     print("="*70)
     
-    cmd = "python train_yolov8s_optimized.py"
+    cmd = "python kaggle/training/train_yolov8s_optimized.py"
     success, output = run_command(cmd, "Training YOLOv8s model")
     
     if success:
@@ -92,12 +92,12 @@ def run_inference(args):
     
     # Basic command - can be extended with source argument
     if args.source:
-        cmd = f"python inference_optimized.py --source {args.source} --model {args.model} --output {args.output}"
+        cmd = f"python kaggle/hybrid/inference.py --source {args.source} --model {args.model} --output {args.output}"
         if args.no_opencv:
             cmd += " --no-opencv"
     else:
         # Run with default settings
-        cmd = f"python inference_optimized.py --source data/test/ --model {args.model} --output {args.output}"
+        cmd = f"python kaggle/hybrid/inference.py --source data/test/ --model {args.model} --output {args.output}"
         if args.no_opencv:
             cmd += " --no-opencv"
     
@@ -118,13 +118,13 @@ def run_tests(args):
     
     test_scripts = []
     if args.test_type == "all":
-        test_scripts = ["test_model.py", "test_model_local.py", "test_model_overlapping.py"]
+        test_scripts = ["local/testing/test_model.py", "local/testing/test_model_local.py", "local/testing/test_model_overlapping.py"]
     elif args.test_type == "local":
-        test_scripts = ["test_model_local.py"]
+        test_scripts = ["local/testing/test_model_local.py"]
     elif args.test_type == "overlapping":
-        test_scripts = ["test_model_overlapping.py"]
+        test_scripts = ["local/testing/test_model_overlapping.py"]
     else:
-        test_scripts = ["test_model_local.py"]  # default
+        test_scripts = ["local/testing/test_model_local.py"]  # default
     
     all_passed = True
     for test_script in test_scripts:
@@ -152,7 +152,7 @@ def launch_web_app(args):
     
     try:
         # Run streamlit in the foreground so user can see the output
-        cmd = "streamlit run streamlit_app.py"
+        cmd = "streamlit run local/app/mobile_app.py"
         os.system(cmd)
         return True
     except KeyboardInterrupt:
