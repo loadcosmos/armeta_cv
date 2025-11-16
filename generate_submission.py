@@ -2,7 +2,7 @@
 """
 Generate submission.json for hackathon
 
-Processes all PDFs (data/pdf/ + data/test/) and creates final submission JSON
+Processes test PDFs (data/test/ - 13 files) and creates final submission JSON
 with all detection results including QR decoding and validation.
 
 Usage:
@@ -19,19 +19,15 @@ from enhanced_inference import EnhancedDocumentProcessor
 
 
 def collect_all_pdfs():
-    """Collect all PDF files from data/pdf/ and data/test/"""
-    pdf_dirs = [
-        Path('data/pdf'),
-        Path('data/test')
-    ]
+    """Collect all PDF files from data/test/ only (13 files)"""
+    pdf_dir = Path('data/test')
 
     all_pdfs = []
-    for pdf_dir in pdf_dirs:
-        if pdf_dir.exists():
-            pdfs = sorted(pdf_dir.glob('*.pdf'))
-            # Filter out Zone.Identifier files
-            pdfs = [p for p in pdfs if 'Zone.Identifier' not in str(p)]
-            all_pdfs.extend(pdfs)
+    if pdf_dir.exists():
+        pdfs = sorted(pdf_dir.glob('*.pdf'))
+        # Filter out Zone.Identifier files
+        pdfs = [p for p in pdfs if 'Zone.Identifier' not in str(p)]
+        all_pdfs.extend(pdfs)
 
     return all_pdfs
 
@@ -59,9 +55,7 @@ def main():
 
     # Collect all PDFs
     all_pdfs = collect_all_pdfs()
-    print(f"\n✓ Found {len(all_pdfs)} PDF files:")
-    print(f"  - data/pdf/: {len([p for p in all_pdfs if 'data/pdf' in str(p)])}")
-    print(f"  - data/test/: {len([p for p in all_pdfs if 'data/test' in str(p)])}")
+    print(f"\n✓ Found {len(all_pdfs)} PDF files in data/test/")
 
     # Initialize processor
     print(f"\n🤖 Loading model: {args.model}")
