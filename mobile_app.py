@@ -1,13 +1,9 @@
 """
-Mobile Document Scanner App - Root Wrapper
+Mobile Document Scanner App
 
-This module provides access to the Streamlit mobile application.
+This is a wrapper that imports the main Streamlit application.
+Can be run directly with: streamlit run mobile_app.py
 """
 
-# Import everything from the actual implementation
+# Import and run the actual implementation
 from local.app.mobile_app import *
-
-# If the module is run directly, this won't work with streamlit
-# Users should run: streamlit run mobile_app.py
-if __name__ == '__main__':
-    print("Please run this app with: streamlit run mobile_app.py")

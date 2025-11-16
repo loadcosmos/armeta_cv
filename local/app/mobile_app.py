@@ -26,6 +26,7 @@ from datetime import datetime
 import json
 
 # Import our modules
+import os
 try:
     from kaggle.hybrid.inference import DocumentDetector, find_model
     from kaggle.hybrid.qr_decoder import QRDecoder, format_qr_data
@@ -34,6 +35,16 @@ try:
 except ImportError:
     st.error("⚠️ Please install all requirements: pip install -r requirements.txt")
     st.stop()
+
+# Cache model loading for better performance
+@st.cache_resource
+def load_models():
+    """Load and cache ML models"""
+    detector = DocumentDetector(conf_threshold=0.25, iou_threshold=0.45)
+    qr_decoder = QRDecoder()
+    validator = DocumentValidator()
+    reporter = HTMLReporter()
+    return detector, qr_decoder, validator, reporter
 
 # Page config
 st.set_page_config(
@@ -112,16 +123,18 @@ st.markdown("""
 # Initialize session state
 if 'pages' not in st.session_state:
     st.session_state.pages = []
-if 'detector' not in st.session_state:
-    try:
-        st.session_state.detector = DocumentDetector(conf_threshold=0.25, iou_threshold=0.45)
-        st.session_state.qr_decoder = QRDecoder()
-        st.session_state.validator = DocumentValidator()
-        st.session_state.reporter = HTMLReporter()
-    except Exception as e:
-        st.error(f"❌ Failed to load model: {e}")
-        st.info("💡 Make sure best.pt is in the correct location")
-        st.stop()
+
+# Load models with caching (only once across all sessions)
+try:
+    detector, qr_decoder, validator, reporter = load_models()
+    st.session_state.detector = detector
+    st.session_state.qr_decoder = qr_decoder
+    st.session_state.validator = validator
+    st.session_state.reporter = reporter
+except Exception as e:
+    st.error(f"❌ Failed to load model: {e}")
+    st.info("💡 Make sure best.pt is in the correct location")
+    st.stop()
 
 def process_image(image):
     """Process single image and return results"""
@@ -393,12 +406,19 @@ with tab3:
                 with st.spinner("Creating PDF..."):
                     # Create PDF from images
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                        tmp_path = tmp.name
                         images = [page['image'].convert('RGB') for page in st.session_state.pages]
-                        images_to_pdf(images, tmp.name)
+                        images_to_pdf(images, tmp_path)
 
                         # Provide download
-                        with open(tmp.name, 'rb') as f:
+                        with open(tmp_path, 'rb') as f:
                             pdf_bytes = f.read()
+
+                        # Clean up temporary file
+                        try:
+                            os.remove(tmp_path)
+                        except:
+                            pass
 
                         st.download_button(
                             label="📄 Download PDF",
