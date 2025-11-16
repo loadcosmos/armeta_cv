@@ -16,6 +16,10 @@ numpy==1.26.4
 pandas==2.2.0
 PyYAML==6.0.1
 tqdm==4.66.2
+scikit-learn>=1.3.0
+
+# QR Code decoding
+pyzbar>=0.1.9
 
 # Visualization
 matplotlib==3.8.3
@@ -26,3 +30,9 @@ streamlit==1.31.1
 # System dependencies (install via apt/brew):
 # - poppler-utils (for pdf2image)
 # - libgl1 (for OpenCV on Linux)
+# - libzbar0 (for pyzbar QR decoding)
+#
+# Installation:
+#   Ubuntu/Debian: sudo apt-get install poppler-utils libgl1 libzbar0
+#   macOS: brew install poppler zbar
+#   Windows: Download poppler binaries + install zbar
