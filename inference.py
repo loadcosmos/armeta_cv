@@ -20,7 +20,7 @@ from pathlib import Path
 from pdf2image import convert_from_path
 from ultralytics import YOLO
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from tqdm import tqdm
 
 # Default model paths (will try in order)
@@ -29,18 +29,18 @@ DEFAULT_MODEL_PATHS = [
     'models/best.pt',                             # models folder
     'runs/detect/train2/weights/best.pt',        # Training output
     'weights/best.pt',                            # weights folder
-# Import everything from the actual implementation
-from kaggle.hybrid.inference import (
-    DocumentDetector,
-    YOLODocumentDetector,
-    find_model,
-    DEFAULT_MODEL,
-    CLASS_NAMES,
-    COLORS
-)
+]
 
-YOLODocumentDetector = DocumentDetector
+# Model and class configuration
+DEFAULT_MODEL = 'best.pt'  # Will be updated by find_model
+CLASS_NAMES = {0: 'signature', 1: 'stamp', 2: 'qr'}
+COLORS = {
+    0: (0, 255, 0),    # signature - green
+    1: (255, 0, 0),    # stamp - blue
+    2: (0, 0, 255),    # qr - red
+}
 
+# Export required names
 __all__ = [
     'DocumentDetector',
     'YOLODocumentDetector',
@@ -61,14 +61,8 @@ def find_model(model_path=None):
 
     return DEFAULT_MODEL_PATHS[0]  # Return first path as default
 
+# Update DEFAULT_MODEL with actual path
 DEFAULT_MODEL = find_model()
-
-CLASS_NAMES = {0: 'signature', 1: 'stamp', 2: 'qr'}
-COLORS = {
-    0: (0, 255, 0),    # signature - green
-    1: (255, 0, 0),    # stamp - blue
-    2: (0, 0, 255),    # qr - red
-}
 
 
 class DocumentDetector:
@@ -256,6 +250,7 @@ def process_single_pdf(detector: DocumentDetector,
 
         for page_idx, pil_img in enumerate(images):
             img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            # Adjust index to match page numbering (starting from 1)
             detections = results['pages'][page_idx]['detections']
 
             img_vis = detector.visualize_detections(img, detections)
