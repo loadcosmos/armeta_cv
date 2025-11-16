@@ -17,3 +17,4 @@ case/
 # Test outputs
 test_results/
 runs/
+env.bak/case/
