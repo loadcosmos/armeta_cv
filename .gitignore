@@ -8,4 +8,4 @@ env/
 .venv/
 .ENV
 .venv.bak/
-env.bak/
+env.bak/case/
