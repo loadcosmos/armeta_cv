@@ -1,0 +1,122 @@
+{
+  "pdf": "ТЗ-2.pdf",
+  "total_pages": 3,
+  "pages": [
+    {
+      "page": 1,
+      "image_size": {
+        "width": 3306,
+        "height": 4678
+      },
+      "detections": [
+        {
+          "class": "stamp",
+          "class_id": 1,
+          "confidence": 0.9625344276428223,
+          "bbox": {
+            "x1": 1905.158935546875,
+            "y1": 425.7078857421875,
+            "x2": 2561.448974609375,
+            "y2": 1071.2696533203125,
+            "width": 656.2900390625,
+            "height": 645.561767578125
+          }
+        },
+        {
+          "class": "signature",
+          "class_id": 0,
+          "confidence": 0.5982853770256042,
+          "bbox": {
+            "x1": 2200.989013671875,
+            "y1": 507.31640625,
+            "x2": 2417.185546875,
+            "y2": 634.7889404296875,
+            "width": 216.196533203125,
+            "height": 127.4725341796875
+          }
+        }
+      ],
+      "summary": {
+        "stamp": 1,
+        "signature": 1
+      }
+    },
+    {
+      "page": 2,
+      "image_size": {
+        "width": 3306,
+        "height": 4678
+      },
+      "detections": [],
+      "summary": {}
+    },
+    {
+      "page": 3,
+      "image_size": {
+        "width": 3306,
+        "height": 4678
+      },
+      "detections": [
+        {
+          "class": "stamp",
+          "class_id": 1,
+          "confidence": 0.9420161843299866,
+          "bbox": {
+            "x1": 2063.95068359375,
+            "y1": 3339.684814453125,
+            "x2": 2702.640380859375,
+            "y2": 3989.17138671875,
+            "width": 638.689697265625,
+            "height": 649.486572265625
+          }
+        },
+        {
+          "class": "signature",
+          "class_id": 0,
+          "confidence": 0.7813788056373596,
+          "bbox": {
+            "x1": 2225.54638671875,
+            "y1": 3467.907958984375,
+            "x2": 2464.021484375,
+            "y2": 3594.953125,
+            "width": 238.47509765625,
+            "height": 127.045166015625
+          }
+        }
+      ],
+      "summary": {
+        "stamp": 1,
+        "signature": 1
+      }
+    }
+  ],
+  "summary": {
+    "total_detections": 4,
+    "by_class": {
+      "stamp": 2,
+      "signature": 2
+    }
+  },
+  "validation": {
+    "status": "warning",
+    "valid": false,
+    "errors": [],
+    "warnings": [
+      {
+        "rule": "has_qr",
+        "description": "Document should have at least 1 QR code",
+        "severity": "warning"
+      }
+    ],
+    "summary": {
+      "total_issues": 1,
+      "errors_count": 0,
+      "warnings_count": 1
+    },
+    "detections_summary": {
+      "signature": 2,
+      "stamp": 2,
+      "qr": 0
+    }
+  }
+}
